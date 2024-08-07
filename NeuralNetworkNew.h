@@ -1,5 +1,5 @@
 #pragma once
-#include "MatrixLib.h"
+#include "1DMatrixLib.h"
 #include <vector>
 #include <cstdlib>
 #include <cmath>
