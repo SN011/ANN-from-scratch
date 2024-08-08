@@ -1,5 +1,5 @@
 #pragma once
-#include "1DMatrixLib.h"
+#include "SYCLMatrixLib.h"
 #include <vector>
 #include <cstdlib>
 #include <cmath>

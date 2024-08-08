@@ -2,7 +2,7 @@
 #include <fstream>
 #include <vector>
 #include "ImageNew.h"
-#include "NeuralNetwork.h"
+#include "NeuralNetworkNew.h"
 #include <random>
 #include <algorithm>
 #include <omp.h>
@@ -15,12 +15,7 @@ std::vector<unsigned int> getRGBFromInt(unsigned int x) {
 	return { red, green, blue };
 }
 
-std::vector<ImageData> cats_training = {};
-std::vector<ImageData> rainbows_training = {};
-std::vector<ImageData> trains_training = {};
-std::vector<ImageData> cats_testing = {};
-std::vector<ImageData> rainbows_testing = {};
-std::vector<ImageData> trains_testing = {};
+std::vector<ImageData> dataset = {};
 std::vector<ImageData> trainingSet = {};
 std::vector<ImageData> testingSet = {};
 
@@ -39,7 +34,7 @@ std::vector<std::string> fileVec{
 };
 int globalOutputNodesCount = fileVec.size();
 
-NeuralNet nn(784, 32, globalOutputNodesCount);
+NeuralNetwork nn(1024, 64, 32, globalOutputNodesCount);
 
 std::vector<Image> images = {};
 const int total = 2000;
@@ -61,8 +56,8 @@ void loadMore() {
 	infile3.close();
 	for (int n = 0; n < total; n++)
 	{
-		int start = 80 + n * 784;
-		for (int i = 0; i < 784; i++)
+		int start = 80 + n * 1024;
+		for (int i = 0; i < 1024; i++)
 		{
 			int index = i + start;
 			unsigned char val1 = static_cast<const char>(data01[index]);
@@ -93,12 +88,18 @@ void prepareData() {
 
 		for (int i = 0; i < total; i++)
 		{
-			int offset = 80+i * 784;
-			vector<float> subvector = { data.begin() + offset, data.begin() + offset + 784 };
-			if (i < (int)(0.8 * total))trainingSet.push_back(ImageData(subvector, label));
-			else testingSet.push_back(ImageData(subvector, label));
+			int offset = 80+i * 1024;
+			vector<float> subvector = { data.begin() + offset, data.begin() + offset + 1024 };
+			dataset.push_back(ImageData(subvector, label));
 		}
 		label++;
+	}
+
+	std::shuffle(dataset.begin(), dataset.end(), std::default_random_engine(0));
+
+	for (int i = 0; i < dataset.size(); i++) {
+		if (i < (int)(0.9 * dataset.size()))trainingSet.push_back(dataset.at(i));
+		else testingSet.push_back(dataset.at(i));
 	}
 
 	for (auto& set : trainingSet) {
@@ -108,8 +109,8 @@ void prepareData() {
 	for (auto& set2 : testingSet) {
 		std::for_each(set2.vec.begin(), set2.vec.end(), [](float& n) {n = n / 255.0f; });
 	}
-	std::shuffle(trainingSet.begin(), trainingSet.end(), std::default_random_engine(0));
-	std::shuffle(testingSet.begin(), testingSet.end(), std::default_random_engine(0));
+	//std::shuffle(trainingSet.begin(), trainingSet.end(), std::default_random_engine(0));
+	//std::shuffle(testingSet.begin(), testingSet.end(), std::default_random_engine(0));
 }
 
 void test() {
@@ -144,6 +145,7 @@ void test() {
 		case 7:guessStr = "ja"; break;
 		case 8:guessStr = "jhha"; break;
 		case 9:guessStr = "nya"; break;
+		case 10:guessStr = "Ta"; break;
 		default:
 			break;
 		}
@@ -169,6 +171,7 @@ void test() {
 		case 7:realStr = "ja"; break;
 		case 8:realStr = "jhha"; break;
 		case 9:realStr = "nya"; break;
+		case 10:realStr = "Ta"; break;
 		default:
 			break;
 		}
@@ -233,6 +236,7 @@ void testUserImage() {
 	case 7:guessStr = "ja"; break;
 	case 8:guessStr = "jhha"; break;
 	case 9:guessStr = "nya"; break;
+	case 10:guessStr = "Ta"; break;
 	default:
 		break;
 	}
@@ -258,6 +262,7 @@ void testUserImage() {
 	case 7:realStr = "ja"; break;
 	case 8:realStr = "jhha"; break;
 	case 9:realStr = "nya"; break;
+	case 10:realStr = "Ta"; break;
 	default:
 		break;
 	}
@@ -280,7 +285,7 @@ int main() {
 	double start = omp_get_wtime();
 	prepareData();
 	std::cout << "Preparing data took " << omp_get_wtime() - start << " seconds\n";
-	for (int j = 0; j < 20; j++)
+	for (int j = 0; j < 10; j++)
 	{
 		std::shuffle(trainingSet.begin(), trainingSet.end(), std::default_random_engine(0));
 
@@ -306,8 +311,8 @@ int main() {
 	for (int n = 0; n < out; n++)
 	{
 		Image img(28, 28);
-		int start = n * 784;
-		for (int i = 0; i < 784; i++)
+		int start = n * 1024;
+		for (int i = 0; i < 1024; i++)
 		{
 			int index = i + start;
 			unsigned char val = static_cast<const char>(data[index]);
