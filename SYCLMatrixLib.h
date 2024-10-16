@@ -15,6 +15,8 @@ public:
     int rows;
     int cols;
     vector<float> data;
+    sycl::queue q{ gpu_selector{} };
+
 
     Matrix() : cols(0), rows(0), data({}) {}
 
@@ -38,7 +40,7 @@ public:
     }
 
     void multiplyScalar(float n) {
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
         q.submit([&](handler& h) {
@@ -50,7 +52,7 @@ public:
     }
 
     void addScalar(float n) {
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
         q.submit([&](handler& h) {
@@ -62,7 +64,7 @@ public:
     }
 
     void negate() {
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
         q.submit([&](handler& h) {
@@ -73,9 +75,9 @@ public:
             }).wait();
     }
 
-    Matrix Negate() const {
+    Matrix Negate() {
         Matrix m(rows, cols);
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf_in(data.data(), range<1>(rows * cols));
         buffer<float, 1> buf_out(m.data.data(), range<1>(rows * cols));
 
@@ -92,7 +94,7 @@ public:
 
     void add(const Matrix& other) {
         if (rows == other.rows && cols == other.cols) {
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_b(other.data.data(), range<1>(rows * cols));
 
@@ -109,10 +111,10 @@ public:
         }
     }
 
-    static Matrix add(const Matrix& m1, const Matrix& m2) {
+    static Matrix add(const Matrix& m1, const Matrix& m2, sycl::queue& q) {
         Matrix result(m1.rows, m1.cols);
         if (m1.rows == m2.rows && m1.cols == m2.cols) {
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(m1.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_b(m2.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_c(result.data.data(), range<1>(m1.rows * m1.cols));
@@ -131,10 +133,10 @@ public:
         return Matrix();
     }
 
-    Matrix Add(const Matrix& other) const {
+    Matrix Add(const Matrix& other) {
         if (rows == other.rows && cols == other.cols) {
             Matrix output(rows, cols);
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_b(other.data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_c(output.data.data(), range<1>(rows * cols));
@@ -153,10 +155,10 @@ public:
         return Matrix();
     }
 
-    static Matrix subtract(const Matrix& m1, const Matrix& m2) {
+    static Matrix subtract(const Matrix& m1, const Matrix& m2, sycl::queue& q) {
         Matrix result(m1.rows, m1.cols);
         if (m1.rows == m2.rows && m1.cols == m2.cols) {
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(m1.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_b(m2.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_c(result.data.data(), range<1>(m1.rows * m1.cols));
@@ -182,7 +184,7 @@ public:
 
         const size_t TILE_SIZE = 8; // Tile size for optimization
         Matrix output(rows, other.cols);
-        queue q{ gpu_selector{} };
+        
         std::cout << "Device: " << q.get_device().get_info<info::device::name>() << "\n";
         buffer<float, 2> bufferA(data.data(), range<2>(rows, cols));
         buffer<float, 2> bufferB(other.data.data(), range<2>(other.rows, other.cols));
@@ -226,14 +228,14 @@ public:
     }
 
 
-    static Matrix multiply(const Matrix& m1, const Matrix& m2) {
+    static Matrix multiply(const Matrix& m1, const Matrix& m2, sycl::queue& q) {
         if (m1.cols != m2.rows) {
             throw std::invalid_argument("Matrix dimensions do not match for multiplication.");
         }
 
         const size_t TILE_SIZE = 16; // Tile size for optimization
         Matrix result(m1.rows, m2.cols);
-        queue q{ gpu_selector{} };
+        
         std::cout << "Device: " << q.get_device().get_info<info::device::name>() << "\n";
         buffer<float, 2> bufferA(m1.data.data(), range<2>(m1.rows, m1.cols));
         buffer<float, 2> bufferB(m2.data.data(), range<2>(m2.rows, m2.cols));
@@ -277,7 +279,7 @@ public:
 
     void elementWiseMult(const Matrix& other) {
         if (rows == other.rows && cols == other.cols) {
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_b(other.data.data(), range<1>(rows * cols));
 
@@ -294,10 +296,10 @@ public:
         }
     }
 
-    Matrix ElementWiseMult(const Matrix& other) const {
+    Matrix ElementWiseMult(const Matrix& other) {
         if (rows == other.rows && cols == other.cols) {
             Matrix output(rows, cols);
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_b(other.data.data(), range<1>(rows * cols));
             buffer<float, 1> buf_c(output.data.data(), range<1>(rows * cols));
@@ -316,10 +318,10 @@ public:
         return Matrix();
     }
 
-    static Matrix ElementWiseMult(const Matrix& m1, const Matrix& m2) {
+    static Matrix ElementWiseMult(const Matrix& m1, const Matrix& m2, sycl::queue& q) {
         if (m1.rows == m2.rows && m1.cols == m2.cols) {
             Matrix output(m1.rows, m1.cols);
-            queue q{ gpu_selector{} };
+            
             buffer<float, 1> buf_a(m1.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_b(m2.data.data(), range<1>(m1.rows * m1.cols));
             buffer<float, 1> buf_c(output.data.data(), range<1>(m1.rows * m1.cols));
@@ -367,7 +369,7 @@ public:
     }
 
     void applySigmoid() {
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
         q.submit([&](handler& h) {
@@ -379,7 +381,7 @@ public:
     }
 
     void applySigmoidDerivative() {
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
         q.submit([&](handler& h) {
@@ -390,9 +392,9 @@ public:
             }).wait();
     }
 
-    static Matrix ApplySigmoid(const Matrix& m) {
+    static Matrix ApplySigmoid(const Matrix& m, sycl::queue& q) {
         Matrix output(m.rows, m.cols);
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf_a(m.data.data(), range<1>(m.rows * m.cols));
         buffer<float, 1> buf_b(output.data.data(), range<1>(m.rows * m.cols));
 
@@ -407,9 +409,9 @@ public:
         return output;
     }
 
-    static Matrix ApplySigmoidDerivative(const Matrix& m) {
+    static Matrix ApplySigmoidDerivative(const Matrix& m, sycl::queue& q) {
         Matrix output(m.rows, m.cols);
-        queue q{ gpu_selector{} };
+        
         buffer<float, 1> buf_a(m.data.data(), range<1>(m.rows * m.cols));
         buffer<float, 1> buf_b(output.data.data(), range<1>(m.rows * m.cols));
 
