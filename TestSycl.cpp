@@ -4,8 +4,9 @@
 #include <iostream>
 
 int main() {
-    Matrix A(1024, 64);
-    Matrix B(64, 32);
+    int N = 512;
+    Matrix A(N, N);
+    Matrix B(N, N);
     A.RandInit();
     B.RandInit();
     
@@ -14,13 +15,13 @@ int main() {
     A.multiply(B);
     std::cout << "took " << omp_get_wtime() - start << std::endl;
     
-    Matrix1D M(1024, 64);
-    Matrix1D N(64, 32);
+    Matrix1D M(N, N);
+    Matrix1D n(N, N);
     M.RandInit();
-    N.RandInit();
+    n.RandInit();
     
     start = omp_get_wtime();
-    M.multiply(N);
+    M.multiply(n);
     std::cout << "took " << omp_get_wtime() - start << std::endl;
 
     return 0;
