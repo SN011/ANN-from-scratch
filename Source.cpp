@@ -263,6 +263,7 @@ int main() {
 	test();
 	int cont = -1;
 	while (cont != 1) {
+		// This python script will format the image that is drawn in paint (in specific file)
 		system("D:\\DEV\\NeuralNet\\PythonApplication1\\PythonApplication1\\PythonApplication1.py");
 		testUserImage();
 
