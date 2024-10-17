@@ -7,6 +7,7 @@
 #include <random>
 #include <CL/sycl.hpp>
 
+
 using namespace std;
 using namespace cl::sycl;
 
@@ -15,9 +16,7 @@ public:
     int rows;
     int cols;
     vector<float> data;
-    sycl::queue q{ gpu_selector{} };
-
-
+    
     Matrix() : cols(0), rows(0), data({}) {}
 
     Matrix(int rows, int cols) : cols(cols), rows(rows), data(rows*cols) {}
@@ -39,7 +38,7 @@ public:
         }
     }
 
-    void multiplyScalar(float n) {
+    void multiplyScalar(float n, sycl::queue& q) {
         
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
@@ -51,7 +50,7 @@ public:
             }).wait();
     }
 
-    void addScalar(float n) {
+    void addScalar(float n, sycl::queue& q) {
         
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
@@ -63,7 +62,7 @@ public:
             }).wait();
     }
 
-    void negate() {
+    void negate(sycl::queue& q) {
         
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
@@ -75,7 +74,7 @@ public:
             }).wait();
     }
 
-    Matrix Negate() {
+    Matrix Negate(sycl::queue& q) {
         Matrix m(rows, cols);
         
         buffer<float, 1> buf_in(data.data(), range<1>(rows * cols));
@@ -92,7 +91,7 @@ public:
         return m;
     }
 
-    void add(const Matrix& other) {
+    void add(const Matrix& other, sycl::queue& q) {
         if (rows == other.rows && cols == other.cols) {
             
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
@@ -133,7 +132,7 @@ public:
         return Matrix();
     }
 
-    Matrix Add(const Matrix& other) {
+    Matrix Add(const Matrix& other, sycl::queue& q) {
         if (rows == other.rows && cols == other.cols) {
             Matrix output(rows, cols);
             
@@ -177,20 +176,7 @@ public:
         return Matrix();
     }
 
-    void multiply(const Matrix& other) {
-        if (cols != other.rows) {
-            throw std::invalid_argument("Matrix dimensions do not match for multiplication.");
-        }
-
-        const size_t TILE_SIZE = 8; // Tile size for optimization
-        Matrix output(rows, other.cols);
-        
-        std::cout << "Device: " << q.get_device().get_info<info::device::name>() << "\n";
-        buffer<float, 2> bufferA(data.data(), range<2>(rows, cols));
-        buffer<float, 2> bufferB(other.data.data(), range<2>(other.rows, other.cols));
-        buffer<float, 2> bufferC(output.data.data(), range<2>(rows, other.cols));
-
-        q.submit([&](handler& cgh) {
+    /*q.submit([&](handler& cgh) {
             accessor a(bufferA, cgh, read_only);
             accessor b(bufferB, cgh, read_only);
             accessor c(bufferC, cgh, read_write);
@@ -220,8 +206,172 @@ public:
                 }
                 c[globalRow][globalCol] = sum;
                 });
+            }).wait();*/
+
+    //void multiply(const Matrix& other, sycl::queue& q) {
+    //    if (cols != other.rows) {
+    //        throw std::invalid_argument("Matrix dimensions do not match for multiplication.");
+    //    }
+
+    //    const size_t TILE_SIZE = 8; // Tile size for optimization
+    //    Matrix output(rows, other.cols);
+    //    
+    //    std::cout << "Device: " << q.get_device().get_info<info::device::name>() << "\n";
+    //    // Calculate padded dimensions
+    //    int paddedRows = (rows % TILE_SIZE == 0) ? rows : rows + (TILE_SIZE - (rows % TILE_SIZE));
+    //    int paddedCols = (other.cols % TILE_SIZE == 0) ? other.cols : other.cols + (TILE_SIZE - (other.cols % TILE_SIZE));
+
+    //    // Update buffers for padded matrices
+    //    buffer<float, 2> bufferA(data.data(), range<2>(paddedRows, paddedCols));
+    //    buffer<float, 2> bufferB(other.data.data(), range<2>(paddedRows, paddedCols));
+    //    buffer<float, 2> bufferC(output.data.data(), range<2>(paddedRows, paddedCols));
+
+    //    /*buffer<float, 2> bufferA(data.data(), range<2>(rows, cols));
+    //    buffer<float, 2> bufferB(other.data.data(), range<2>(other.rows, other.cols));
+    //    buffer<float, 2> bufferC(output.data.data(), range<2>(rows, other.cols));*/
+
+    //    
+
+    //    q.submit([&](handler& cgh) {
+    //        accessor a(bufferA, cgh, read_only);
+    //        accessor b(bufferB, cgh, read_only);
+    //        accessor c(bufferC, cgh, read_write);
+
+    //        accessor<float, 1, access::mode::read_write, access::target::local> localA(range<1>(TILE_SIZE * TILE_SIZE), cgh);
+    //        accessor<float, 1, access::mode::read_write, access::target::local> localB(range<1>(TILE_SIZE * TILE_SIZE), cgh);
+
+    //        int localRows = rows;  // Capture rows explicitly
+    //        int localCols = cols;  // Capture cols explicitly
+    //        int otherCols = other.cols;  // Capture other matrix's cols explicitly
+
+    //        cgh.parallel_for(nd_range<2>(range<2>(rows, otherCols), range<2>(TILE_SIZE, TILE_SIZE)), [=](nd_item<2> item) {
+    //            int globalRow = item.get_global_id(0);
+    //            int globalCol = item.get_global_id(1);
+    //            int localRow = item.get_local_id(0);
+    //            int localCol = item.get_local_id(1);
+
+    //            float sum = 0.0f;
+
+    //            for (int k = 0; k < localCols; k += TILE_SIZE) {
+    //                if (globalRow < localRows && (k + localCol) < localCols)
+    //                    localA[localRow * TILE_SIZE + localCol] = a[globalRow][k + localCol];
+    //                else
+    //                    localA[localRow * TILE_SIZE + localCol] = 0.0f;
+
+    //                if (globalCol < otherCols && (k + localRow) < localCols)
+    //                    localB[localRow * TILE_SIZE + localCol] = b[k + localRow][globalCol];
+    //                else
+    //                    localB[localRow * TILE_SIZE + localCol] = 0.0f;
+
+    //                item.barrier(access::fence_space::local_space);
+
+    //                for (int j = 0; j < TILE_SIZE; ++j) {
+    //                    sum += localA[localRow * TILE_SIZE + j] * localB[j * TILE_SIZE + localCol];
+    //                }
+    //                item.barrier(access::fence_space::local_space);
+    //            }
+
+    //            if (globalRow < localRows && globalCol < otherCols) {
+    //                c[globalRow][globalCol] = sum;
+    //            }
+    //            });
+    //        }).wait();
+
+
+    //    data = std::move(output.data);
+    //    rows = output.rows;
+    //    cols = output.cols;
+    //}
+
+    void multiply(const Matrix& other, sycl::queue& q) {
+        if (cols != other.rows) {
+            throw std::invalid_argument("Matrix dimensions do not match for multiplication.");
+        }
+
+        const size_t TILE_SIZE = 8; // Tile size for optimization
+
+        // Create output matrix
+        Matrix output(rows, other.cols);
+
+        // Create padded data vectors to avoid out-of-bounds access
+        int paddedRows = (rows % TILE_SIZE == 0) ? rows : rows + (TILE_SIZE - (rows % TILE_SIZE));
+        int paddedCols = (cols % TILE_SIZE == 0) ? cols : cols + (TILE_SIZE - (cols % TILE_SIZE));
+        int paddedOtherCols = (other.cols % TILE_SIZE == 0) ? other.cols : other.cols + (TILE_SIZE - (other.cols % TILE_SIZE));
+
+        std::vector<float> paddedA(paddedRows * paddedCols, 0.0f);
+        std::vector<float> paddedB(paddedCols * paddedOtherCols, 0.0f);
+        std::vector<float> paddedC(paddedRows * paddedOtherCols, 0.0f);
+
+        // Copy original data into padded vectors
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < cols; ++j) {
+                paddedA[i * paddedCols + j] = data[i * cols + j];
+            }
+        }
+
+        for (int i = 0; i < other.rows; ++i) {
+            for (int j = 0; j < other.cols; ++j) {
+                paddedB[i * paddedOtherCols + j] = other.data[i * other.cols + j];
+            }
+        }
+
+        buffer<float, 2> bufferA(paddedA.data(), range<2>(paddedRows, paddedCols));
+        buffer<float, 2> bufferB(paddedB.data(), range<2>(paddedCols, paddedOtherCols));
+        buffer<float, 2> bufferC(paddedC.data(), range<2>(paddedRows, paddedOtherCols));
+
+        // Set the global range to be padded to the nearest multiple of TILE_SIZE
+        size_t globalRows = ((paddedRows + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE;
+        size_t globalCols = ((paddedOtherCols + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE;
+
+        q.submit([&](handler& cgh) {
+            accessor a(bufferA, cgh, read_only);
+            accessor b(bufferB, cgh, read_only);
+            accessor c(bufferC, cgh, read_write);
+
+            accessor<float, 1, access::mode::read_write, access::target::local> localA(range<1>(TILE_SIZE * TILE_SIZE), cgh);
+            accessor<float, 1, access::mode::read_write, access::target::local> localB(range<1>(TILE_SIZE * TILE_SIZE), cgh);
+
+            cgh.parallel_for(nd_range<2>(range<2>(globalRows, globalCols), range<2>(TILE_SIZE, TILE_SIZE)), [=](nd_item<2> item) {
+                int globalRow = item.get_global_id(0);
+                int globalCol = item.get_global_id(1);
+                int localRow = item.get_local_id(0);
+                int localCol = item.get_local_id(1);
+
+                float sum = 0.0f;
+
+                for (int k = 0; k < paddedCols; k += TILE_SIZE) {
+                    if (globalRow < paddedRows && (k + localCol) < paddedCols)
+                        localA[localRow * TILE_SIZE + localCol] = a[globalRow][k + localCol];
+                    else
+                        localA[localRow * TILE_SIZE + localCol] = 0.0f;
+
+                    if (globalCol < paddedOtherCols && (k + localRow) < paddedCols)
+                        localB[localRow * TILE_SIZE + localCol] = b[k + localRow][globalCol];
+                    else
+                        localB[localRow * TILE_SIZE + localCol] = 0.0f;
+
+                    item.barrier(access::fence_space::local_space);
+
+                    for (int j = 0; j < TILE_SIZE; ++j) {
+                        sum += localA[localRow * TILE_SIZE + j] * localB[j * TILE_SIZE + localCol];
+                    }
+                    item.barrier(access::fence_space::local_space);
+                }
+
+                if (globalRow < paddedRows && globalCol < paddedOtherCols) {
+                    c[globalRow][globalCol] = sum;
+                }
+                });
             }).wait();
 
+        // Copy result back to the original output matrix (non-padded)
+        for (int i = 0; i < rows; ++i) {
+            for (int j = 0; j < other.cols; ++j) {
+                output.data[i * other.cols + j] = paddedC[i * paddedOtherCols + j];
+            }
+        }
+
+        // Update current matrix with the result
         data = std::move(output.data);
         rows = output.rows;
         cols = output.cols;
@@ -234,24 +384,49 @@ public:
         }
 
         const size_t TILE_SIZE = 16; // Tile size for optimization
+
+        // Create output matrix
         Matrix result(m1.rows, m2.cols);
-        
-        std::cout << "Device: " << q.get_device().get_info<info::device::name>() << "\n";
-        buffer<float, 2> bufferA(m1.data.data(), range<2>(m1.rows, m1.cols));
-        buffer<float, 2> bufferB(m2.data.data(), range<2>(m2.rows, m2.cols));
-        buffer<float, 2> bufferC(result.data.data(), range<2>(m1.rows, m2.cols));
+
+        // Create padded data vectors to avoid out-of-bounds access
+        int paddedRows = (m1.rows % TILE_SIZE == 0) ? m1.rows : m1.rows + (TILE_SIZE - (m1.rows % TILE_SIZE));
+        int paddedCols = (m1.cols % TILE_SIZE == 0) ? m1.cols : m1.cols + (TILE_SIZE - (m1.cols % TILE_SIZE));
+        int paddedOtherCols = (m2.cols % TILE_SIZE == 0) ? m2.cols : m2.cols + (TILE_SIZE - (m2.cols % TILE_SIZE));
+
+        std::vector<float> paddedA(paddedRows * paddedCols, 0.0f);
+        std::vector<float> paddedB(paddedCols * paddedOtherCols, 0.0f);
+        std::vector<float> paddedC(paddedRows * paddedOtherCols, 0.0f);
+
+        // Copy original data into padded vectors
+        for (int i = 0; i < m1.rows; ++i) {
+            for (int j = 0; j < m1.cols; ++j) {
+                paddedA[i * paddedCols + j] = m1.data[i * m1.cols + j];
+            }
+        }
+
+        for (int i = 0; i < m2.rows; ++i) {
+            for (int j = 0; j < m2.cols; ++j) {
+                paddedB[i * paddedOtherCols + j] = m2.data[i * m2.cols + j];
+            }
+        }
+
+        buffer<float, 2> bufferA(paddedA.data(), range<2>(paddedRows, paddedCols));
+        buffer<float, 2> bufferB(paddedB.data(), range<2>(paddedCols, paddedOtherCols));
+        buffer<float, 2> bufferC(paddedC.data(), range<2>(paddedRows, paddedOtherCols));
+
+        // Set the global range to be padded to the nearest multiple of TILE_SIZE
+        size_t globalRows = ((paddedRows + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE;
+        size_t globalCols = ((paddedOtherCols + TILE_SIZE - 1) / TILE_SIZE) * TILE_SIZE;
 
         q.submit([&](handler& cgh) {
             accessor a(bufferA, cgh, read_only);
             accessor b(bufferB, cgh, read_only);
-            accessor c(bufferC, cgh, read_write);
+            accessor c(bufferC, cgh, write_only, noinit);
 
-            accessor<float, 1, access::mode::read_write, access::target::local> localA(range<1>(TILE_SIZE * TILE_SIZE), cgh);
-            accessor<float, 1, access::mode::read_write, access::target::local> localB(range<1>(TILE_SIZE * TILE_SIZE), cgh);
+            accessor<float, 1, access::mode::read_write, access::target::local> localA(TILE_SIZE * TILE_SIZE, cgh);
+            accessor<float, 1, access::mode::read_write, access::target::local> localB(TILE_SIZE * TILE_SIZE, cgh);
 
-            int resultCols = m2.cols;
-            int sharedDim = m1.cols;
-            cgh.parallel_for(nd_range<2>(range<2>(m1.rows, resultCols), range<2>(TILE_SIZE, TILE_SIZE)), [=](nd_item<2> item) {
+            cgh.parallel_for(nd_range<2>(range<2>(globalRows, globalCols), range<2>(TILE_SIZE, TILE_SIZE)), [=](nd_item<2> item) {
                 int globalRow = item.get_global_id(0);
                 int globalCol = item.get_global_id(1);
                 int localRow = item.get_local_id(0);
@@ -259,25 +434,44 @@ public:
 
                 float sum = 0.0f;
 
-                for (int k = 0; k < sharedDim; k += TILE_SIZE) {
-                    localA[localRow * TILE_SIZE + localCol] = a[globalRow][k + localCol];
-                    localB[localRow * TILE_SIZE + localCol] = b[k + localRow][globalCol];
+                for (int k = 0; k < paddedCols; k += TILE_SIZE) {
+                    if (globalRow < paddedRows && (k + localCol) < paddedCols)
+                        localA[localRow * TILE_SIZE + localCol] = a[globalRow][k + localCol];
+                    else
+                        localA[localRow * TILE_SIZE + localCol] = 0.0f;
+
+                    if (globalCol < paddedOtherCols && (k + localRow) < paddedCols)
+                        localB[localRow * TILE_SIZE + localCol] = b[k + localRow][globalCol];
+                    else
+                        localB[localRow * TILE_SIZE + localCol] = 0.0f;
+
                     item.barrier(access::fence_space::local_space);
 
                     for (int j = 0; j < TILE_SIZE; ++j) {
                         sum += localA[localRow * TILE_SIZE + j] * localB[j * TILE_SIZE + localCol];
                     }
+
                     item.barrier(access::fence_space::local_space);
                 }
-                c[globalRow][globalCol] = sum;
+
+                if (globalRow < paddedRows && globalCol < paddedOtherCols) {
+                    c[globalRow][globalCol] = sum;
+                }
                 });
             }).wait();
+
+        // Copy result back to the original output matrix (non-padded)
+        for (int i = 0; i < m1.rows; ++i) {
+            for (int j = 0; j < m2.cols; ++j) {
+                result.data[i * m2.cols + j] = paddedC[i * paddedOtherCols + j];
+            }
+        }
 
         return result;
     }
 
 
-    void elementWiseMult(const Matrix& other) {
+    void elementWiseMult(const Matrix& other, sycl::queue& q) {
         if (rows == other.rows && cols == other.cols) {
             
             buffer<float, 1> buf_a(data.data(), range<1>(rows * cols));
@@ -296,7 +490,7 @@ public:
         }
     }
 
-    Matrix ElementWiseMult(const Matrix& other) {
+    Matrix ElementWiseMult(const Matrix& other, sycl::queue& q) {
         if (rows == other.rows && cols == other.cols) {
             Matrix output(rows, cols);
             
@@ -368,7 +562,7 @@ public:
         return x * (1 - x);
     }
 
-    void applySigmoid() {
+    void applySigmoid(sycl::queue& q) {
         
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
@@ -380,7 +574,7 @@ public:
             }).wait();
     }
 
-    void applySigmoidDerivative() {
+    void applySigmoidDerivative(sycl::queue& q) {
         
         buffer<float, 1> buf(data.data(), range<1>(rows * cols));
 
@@ -425,6 +619,25 @@ public:
 
         return output;
     }
+
+    Matrix sumAlongAxis(int axis) const {
+        if (axis == 1) {
+            // Sum along each row (axis = 1), which means sum across columns for each row
+            Matrix result(rows, 1);
+            for (int i = 0; i < rows; i++) {
+                float sum = 0.0f;
+                for (int j = 0; j < cols; j++) {
+                    sum += data[i * cols + j];
+                }
+                result.data[i] = sum;
+            }
+            return result;
+        }
+        else {
+            throw std::invalid_argument("Only axis 1 (sum along rows) is implemented.");
+        }
+    }
+
 
     static Matrix fromArr(const vector<float>& arr) {
         Matrix output(arr.size(), 1);
